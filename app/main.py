@@ -47,10 +47,6 @@ def verify(token:str = Depends(token_bearer),db:Session = Depends(database.get_d
     data =crud.verify(token,db)
     return data
 
-@app.get('/users',response_model = List[schema.Delete_user])
-def get_users(db:Session = Depends(database.get_db)):
-    return db.query(models.User).all()
-
 # Mount static files AFTER all API routes so they don't shadow API endpoints
 if FRONTEND_DIR.exists():
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
