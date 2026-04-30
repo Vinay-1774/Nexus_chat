@@ -28,5 +28,4 @@ def login(db:Session,details:schema.Login):
     )
     
 def verify():
-     
-
+    pass
