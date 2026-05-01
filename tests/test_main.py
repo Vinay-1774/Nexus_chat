@@ -15,5 +15,4 @@ payload = {
 def test_register_user():
     response = client.post("/register", json=payload)
     assert response.status_code == 200
-    assert response.json() == {"registered": "successfully"}
-    
+    assert response.json() == {"registered": "successfully"}    

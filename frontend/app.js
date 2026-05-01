@@ -102,7 +102,7 @@ async function handleLogin(e) {
         formData.append('username', username);
         formData.append('password', password);
 
-        const res = await fetch(`${API_BASE}/Login`, {
+        const res = await fetch(`${API_BASE}/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData
@@ -193,7 +193,6 @@ async function showDashboard() {
         document.getElementById('auth-view').classList.remove('active');
         document.getElementById('dashboard-view').classList.add('active');
 
-        loadUsers();
     } catch (err) {
         localStorage.removeItem('access_token');
         localStorage.removeItem('login_time');
@@ -201,45 +200,13 @@ async function showDashboard() {
     }
 }
 
+
+
 function updateDashTime() {
     const now = new Date();
     document.getElementById('dash-time').textContent = now.toLocaleDateString('en-US', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
-}
-
-// ===== Load Users =====
-async function loadUsers() {
-    const token = localStorage.getItem('access_token');
-    const container = document.getElementById('users-list');
-    container.innerHTML = '<div class="loading-state"><div class="spinner"></div><span>Loading users...</span></div>';
-
-    try {
-        const res = await fetch(`${API_BASE}/users`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!res.ok) throw new Error('Failed to load users');
-        const users = await res.json();
-
-        if (users.length === 0) {
-            container.innerHTML = '<div class="empty-state">No users found</div>';
-            return;
-        }
-
-        const colors = ['#818cf8', '#c084fc', '#38bdf8', '#34d399', '#fbbf24', '#f87171'];
-        container.innerHTML = users.map((u, i) => `
-            <div class="user-row">
-                <div class="avatar" style="background:${colors[i % colors.length]}">${u.username.charAt(0).toUpperCase()}</div>
-                <div class="user-row-info">
-                    <div class="user-row-name">${u.username}</div>
-                    <div class="user-row-email">${u.email}</div>
-                </div>
-                <span class="user-row-id">#${u.id}</span>
-            </div>
-        `).join('');
-    } catch (err) {
-        container.innerHTML = '<div class="empty-state">Could not load users</div>';
-    }
 }
 
 // ===== Logout =====
