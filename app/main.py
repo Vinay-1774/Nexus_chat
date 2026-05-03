@@ -34,14 +34,14 @@ token_bearer = OAuth2PasswordBearer(tokenUrl="/login")
 async def serve_styles():
     style_file = FRONTEND_DIR / "styles.css"
     if style_file.exists():
-        return FileResponse(str(style_file), media_type="text/css")
+        return FileResponse(str(style_file), media_type="text/css", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     return {"error": "styles.css not found"}
 
 @app.get("/static/app.js", include_in_schema=False)
 async def serve_app_js():
     app_file = FRONTEND_DIR / "app.js"
     if app_file.exists():
-        return FileResponse(str(app_file), media_type="application/javascript")
+        return FileResponse(str(app_file), media_type="application/javascript", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     return {"error": "app.js not found"}
 
 # ---- API Routes ----
@@ -71,5 +71,5 @@ async def serve_index():
     index_file = FRONTEND_DIR / "index.html"
     print(f"Serving index.html from: {index_file}")
     if index_file.exists():
-        return FileResponse(str(index_file), media_type="text/html")
+        return FileResponse(str(index_file), media_type="text/html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     return {"error": "Frontend not found"}
