@@ -1,8 +1,8 @@
 // ===== Configuration =====
-// Auto-detect: if served by FastAPI on port 8000, use same origin; otherwise fallback
-const API_BASE = window.location.port === '8000'
-    ? window.location.origin
-    : 'http://127.0.0.1:8000';
+// API base URL - when served via Live Server on port 5500, use 8000 for API calls
+const API_BASE = window.location.port === '5500' || window.location.port === '5173'
+    ? 'http://127.0.0.1:8000'
+    : window.location.origin;
 
 // ===== Tab Switching =====
 function switchTab(tab) {
@@ -104,6 +104,7 @@ async function handleLogin(e) {
 
         const res = await fetch(`${API_BASE}/login`, {
             method: 'POST',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData
         });
@@ -111,8 +112,7 @@ async function handleLogin(e) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Login failed');
 
-        localStorage.setItem('access_token', data.access_token);
-        localStorage.setItem('login_time', new Date().toISOString());
+
         showToast('Login successful!', 'success');
         setTimeout(() => showDashboard(), 500);
     } catch (err) {
@@ -138,6 +138,7 @@ async function handleRegister(e) {
     try {
         const res = await fetch(`${API_BASE}/register`, {
             method: 'POST',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
@@ -159,68 +160,221 @@ async function handleRegister(e) {
 
 // ===== Show Dashboard =====
 async function showDashboard() {
-    const token = localStorage.getItem('access_token');
-    if (!token) return;
-
     try {
+        console.log('Fetching user data from:', `${API_BASE}/verify`);
         const res = await fetch(`${API_BASE}/verify`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include'
         });
-        if (!res.ok) throw new Error('Session expired');
+        
+        if (!res.ok) {
+            console.error('Verify failed:', res.status, res.statusText);
+            throw new Error('Session expired');
+        }
+        
         const user = await res.json();
+        console.log('User data received:', user);
 
         // Populate dashboard
         const initial = user.username.charAt(0).toUpperCase();
-        document.getElementById('nav-avatar').textContent = initial;
-        document.getElementById('nav-username').textContent = user.username;
-        document.getElementById('dash-username').textContent = user.username;
-        document.getElementById('dash-avatar-lg').textContent = initial;
-        document.getElementById('detail-username').textContent = user.username;
-        document.getElementById('detail-email').textContent = user.email;
-        document.getElementById('detail-mobile').textContent = user.mobile_no;
+        
+        // Navigation bar
+        const navAvatar = document.getElementById('nav-avatar');
+        const navUsername = document.getElementById('nav-username');
+        if (navAvatar) navAvatar.textContent = initial;
+        if (navUsername) navUsername.textContent = user.username;
+        console.log('Nav updated');
+        
+        // Welcome section
+        const dashUsername = document.getElementById('dash-username');
+        if (dashUsername) dashUsername.textContent = user.username;
+        console.log('Welcome text updated');
+        
+        // Profile card
+        const dashAvatarLg = document.getElementById('dash-avatar-lg');
+        const detailUsername = document.getElementById('detail-username');
+        const detailEmail = document.getElementById('detail-email');
+        const detailMobile = document.getElementById('detail-mobile');
+        
+        if (dashAvatarLg) dashAvatarLg.textContent = initial;
+        if (detailUsername) detailUsername.textContent = user.username;
+        if (detailEmail) detailEmail.textContent = user.email;
+        if (detailMobile) detailMobile.textContent = user.mobile_no;
+        console.log('Profile details updated');
 
         // Session info
-        const loginTime = localStorage.getItem('login_time');
-        document.getElementById('session-time').textContent = loginTime
-            ? new Date(loginTime).toLocaleTimeString() : 'Just now';
-        document.getElementById('session-expiry').textContent = '30 minutes';
+        const sessionTime = document.getElementById('session-time');
+        const sessionExpiry = document.getElementById('session-expiry');
+        if (sessionTime) sessionTime.textContent = 'Just now';
+        if (sessionExpiry) sessionExpiry.textContent = '30 minutes';
+        console.log('Session info updated');
 
         // Time display
         updateDashTime();
         setInterval(updateDashTime, 60000);
 
+        // Start session countdown timer
+        startSessionTimer();
+
         // Switch views
-        document.getElementById('auth-view').classList.remove('active');
-        document.getElementById('dashboard-view').classList.add('active');
+        const authView = document.getElementById('auth-view');
+        const dashView = document.getElementById('dashboard-view');
+        if (authView) authView.classList.remove('active');
+        if (dashView) dashView.classList.add('active');
+        console.log('Views switched to dashboard');
 
     } catch (err) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('login_time');
+        console.error('Dashboard error:', err);
         showToast('Session expired. Please login again.', 'error');
     }
 }
 
 
 
+// ===== Session Timer Management =====
+let sessionTimerInterval = null;
+let sessionEndTime = null;
+const SESSION_DURATION_MINUTES = 30;
+
+function formatTimeRemaining(seconds) {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+}
+
+function updateSessionTimer() {
+    if (!sessionEndTime) return;
+    
+    const now = Date.now();
+    const timeRemaining = Math.max(0, Math.floor((sessionEndTime - now) / 1000));
+    
+    const timerElement = document.getElementById('session-countdown');
+    const timerContainer = timerElement?.parentElement;
+    
+    if (timerElement) {
+        timerElement.textContent = formatTimeRemaining(timeRemaining);
+    }
+    
+    // Update timer state based on remaining time
+    if (timerContainer) {
+        timerContainer.classList.remove('warning', 'critical');
+        if (timeRemaining <= 0) {
+            // Session expired - auto logout
+            handleLogout();
+            if (sessionTimerInterval) clearInterval(sessionTimerInterval);
+        } else if (timeRemaining <= 300) {
+            // Less than 5 minutes - critical warning
+            timerContainer.classList.add('critical');
+        } else if (timeRemaining <= 600) {
+            // Less than 10 minutes - warning
+            timerContainer.classList.add('warning');
+        }
+    }
+}
+
+function startSessionTimer() {
+    // Clear any existing timer
+    if (sessionTimerInterval) clearInterval(sessionTimerInterval);
+    
+    // Set session end time to 30 minutes from now
+    sessionEndTime = Date.now() + (SESSION_DURATION_MINUTES * 60 * 1000);
+    
+    // Update immediately
+    updateSessionTimer();
+    
+    // Update every second
+    sessionTimerInterval = setInterval(updateSessionTimer, 1000);
+}
+
+function stopSessionTimer() {
+    if (sessionTimerInterval) {
+        clearInterval(sessionTimerInterval);
+        sessionTimerInterval = null;
+    }
+    sessionEndTime = null;
+}
+
 function updateDashTime() {
     const now = new Date();
-    document.getElementById('dash-time').textContent = now.toLocaleDateString('en-US', {
-        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-    });
+    const dashTimeElement = document.getElementById('dash-time');
+    if (dashTimeElement) {
+        dashTimeElement.textContent = now.toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+    }
 }
 
-// ===== Logout =====
-function handleLogout() {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('login_time');
-    document.getElementById('dashboard-view').classList.remove('active');
-    document.getElementById('auth-view').classList.add('active');
-    document.getElementById('login-form').reset();
-    showToast('Logged out successfully', 'success');
+// ===== Logout Handler =====
+async function handleLogout() {
+    try {
+        // Stop session timer
+        stopSessionTimer();
+
+        const res = await fetch(`${API_BASE}/log-out`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+
+        if (!res.ok) throw new Error('Logout failed');
+
+        // Reset forms
+        document.getElementById('login-form').reset();
+        document.getElementById('register-form').reset();
+        document.querySelectorAll('.strength-bar').forEach(b => b.className = 'strength-bar');
+        document.querySelector('.strength-text').textContent = '';
+
+        // Switch views
+        document.getElementById('dashboard-view').classList.remove('active');
+        document.getElementById('auth-view').classList.add('active');
+
+        // Reset to login tab
+        switchTab('login');
+
+        showToast('Logged out successfully', 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
 }
 
-// ===== Auto-login if token exists =====
-window.addEventListener('DOMContentLoaded', () => {
-    const token = localStorage.getItem('access_token');
-    if (token) showDashboard();
+// ===== Initialize Page =====
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('Page loaded');
+    console.log('API_BASE:', API_BASE);
+    
+    // Verify all dashboard elements exist
+    const dashboardElements = [
+        'nav-avatar', 'nav-username', 'dash-username', 'dash-avatar-lg',
+        'detail-username', 'detail-email', 'detail-mobile',
+        'session-time', 'session-expiry', 'dash-time',
+        'auth-view', 'dashboard-view'
+    ];
+    
+    const missingElements = dashboardElements.filter(id => !document.getElementById(id));
+    if (missingElements.length > 0) {
+        console.warn('Missing elements:', missingElements);
+    } else {
+        console.log('All dashboard elements found!');
+    }
 });
+
+// Debug function - call from console to test
+window.debugDashboard = async function() {
+    console.log('=== DEBUG DASHBOARD ===');
+    try {
+        const res = await fetch(`${API_BASE}/verify`, { credentials: 'include' });
+        console.log('Response status:', res.status);
+        const user = await res.json();
+        console.log('User data:', user);
+        
+        // Check elements
+        console.log('dash-avatar-lg element:', document.getElementById('dash-avatar-lg'));
+        console.log('detail-username element:', document.getElementById('detail-username'));
+        console.log('detail-email element:', document.getElementById('detail-email'));
+        console.log('detail-mobile element:', document.getElementById('detail-mobile'));
+        
+        return user;
+    } catch(e) {
+        console.error('Error:', e);
+    }
+};
+
+

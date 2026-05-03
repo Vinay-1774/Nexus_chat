@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="http://127.0.0.1:8000/static/styles.css">
 </head>
 <body>
 
@@ -283,13 +283,16 @@
                             <span class="info-label">IP Address</span>
                             <span class="info-value">Protected</span>
                         </div>
+                        <div class="info-item session-timer">
+                            <span class="info-label">Session Expires In</span>
+                            <span class="info-value" id="session-countdown">30:00</span>
+                        </div>
                     </div>
                 </div>
-
             </div>
         </main>
     </div>
 
-    <script src="/static/app.js"></script>
+    <script src="http://127.0.0.1:8000/static/app.js"></script>
 </body>
 </html>

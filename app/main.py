@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from auth import create_access_token, verify_token
+from auth import verify_token_cookies
 import schema, database, crud
 from pathlib import Path
 
@@ -15,13 +15,7 @@ app = FastAPI()
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:8000",
-        "http://localhost:8000",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,9 +23,26 @@ app.add_middleware(
 
 # Resolve frontend directory path (plain HTML/CSS/JS — no build step needed)
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+print(f"Frontend directory: {FRONTEND_DIR}")
+print(f"Frontend exists: {FRONTEND_DIR.is_dir()}")
 
 # OAuth2 scheme
 token_bearer = OAuth2PasswordBearer(tokenUrl="/login")
+
+# ---- Static Files Routes ----
+@app.get("/static/styles.css", include_in_schema=False)
+async def serve_styles():
+    style_file = FRONTEND_DIR / "styles.css"
+    if style_file.exists():
+        return FileResponse(str(style_file), media_type="text/css")
+    return {"error": "styles.css not found"}
+
+@app.get("/static/app.js", include_in_schema=False)
+async def serve_app_js():
+    app_file = FRONTEND_DIR / "app.js"
+    if app_file.exists():
+        return FileResponse(str(app_file), media_type="application/javascript")
+    return {"error": "app.js not found"}
 
 # ---- API Routes ----
 
@@ -42,24 +53,23 @@ def registration(details: schema.registration, db: Session = Depends(database.ge
 
 @app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
-    access_token = crud.login(form_data, db)
-    return {"access_token": access_token, "token_type": "bearer"}
+    response = crud.login(form_data, db)
+    return response 
 
 @app.get("/verify", response_model=schema.UserResponse)
-def verify(token: str = Depends(token_bearer), db: Session = Depends(database.get_db)):
-    data = crud.verify(token, db)
+def verify(username: str = Depends(verify_token_cookies), db: Session = Depends(database.get_db)):
+    data = crud.verify(username, db)
     return data
 
-# ---- Static Files and Frontend Serving ----
+@app.post('/log-out')
+def log_out():
+   return crud.log_out()
 
-# Serve JS, CSS, images from the frontend folder at /static
-if FRONTEND_DIR.is_dir():
-    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="frontend_static")
-
-# Serve index.html at root — visit http://127.0.0.1:8000
-@app.get("/")
+# Serve index.html at root
+@app.get("/", include_in_schema=False)
 async def serve_index():
     index_file = FRONTEND_DIR / "index.html"
+    print(f"Serving index.html from: {index_file}")
     if index_file.exists():
-        return FileResponse(index_file)
-    return {"message": "Frontend not found. Check the frontend directory."}
+        return FileResponse(str(index_file), media_type="text/html")
+    return {"error": "Frontend not found"}

@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from fastapi import HTTPException
+from fastapi import HTTPException,Cookie
 from config import settings
 
 # instead of authlib.jose
@@ -32,3 +32,10 @@ def verify_token(token: str):
         return username
     except JoseError:
         raise HTTPException(status_code=401, detail="couldn't validate credentials")
+
+def verify_token_cookies(access_token:str = Cookie(default=None)):
+    if not access_token:
+        raise HTTPException(status_code=401,detail='Not Authenticated')
+    return verify_token(access_token)
+    
+    
